@@ -8,22 +8,47 @@ roadmap.
 ## Stack
 
 - Next.js (App Router)
-- better-sqlite3 (no native engine download required, unlike Prisma)
-- Plain SQL schema (`db/schema.sql`) written to be portable to Postgres/Supabase
+- Postgres via `pg` (works with Supabase, Vercel Postgres/Neon, or any
+  other Postgres host — see deploy notes below)
+- Plain SQL schema (`db/schema.sql`)
 
 ## Getting started
 
+1. Get a Postgres database. Easiest options:
+   - Local: `createdb freakmount` (needs a local Postgres server running)
+   - Hosted: a free [Supabase](https://supabase.com) or
+     [Neon](https://neon.tech) project, or Vercel's own Postgres storage
+     add-on (Vercel dashboard → your project → Storage)
+2. Copy `.env.example` to `.env` and set `DATABASE_URL` to that database's
+   connection string.
+3. Install, seed, run:
+
 ```bash
 npm install
-npm run seed   # creates db/freakmount.db and loads sample data
+npm run seed   # applies db/schema.sql and loads sample data
 npm run dev    # http://localhost:3000
 ```
+
+## Deploying to Vercel
+
+1. Import this repo into Vercel ([vercel.com/new](https://vercel.com/new)).
+2. Add a Postgres database — either Vercel's own Storage tab (Neon-backed)
+   or a Supabase project — and copy its connection string into the
+   project's **Environment Variables** as `DATABASE_URL`. (Vercel's own
+   Postgres add-on names its variable `POSTGRES_URL`; if you use that,
+   also add a `DATABASE_URL` env var with the same value, since that's
+   the name this app reads.)
+3. Deploy.
+4. Once deployed, initialize the schema and seed data by running
+   `DATABASE_URL=<that connection string> npm run seed` from your machine
+   (pointed at the same database) — the app itself never writes data in
+   this phase, so nothing seeds it automatically.
 
 ## Scripts
 
 | Script | Does |
 |---|---|
-| `npm run seed` | (Re)creates the schema and loads seed data (`db/seed.js`) |
+| `npm run seed` | Applies `db/schema.sql` and (re)loads seed data (`db/seed.js`) — safe to re-run, wipes and reloads |
 | `npm run dev` | Next.js dev server |
 | `npm run build` | Production build |
 | `npm run digest` | Prints the daily ops digest to the console (`scripts/daily-digest.js`) — stands in for a scheduled job that would post the same digest to Slack |
@@ -42,7 +67,6 @@ All four dashboard cards are backed by real SQL queries in `lib/automation.js`:
 1. Authentication / login
 2. Real 3PL API integration (Shipmonk, Shared Warehouse Ltd) — inventory and sales data is seeded, not synced
 3. Aftership integration for returns
-4. Forms/UI to create or edit POs
+4. Forms/UI to create or edit POs — note that `id` columns are `SERIAL`, so a later create-PO form can just omit `id` on insert and let Postgres assign it
 5. Sales inflow forecasting in the cash flow projection (outflow only)
-6. Migration to Postgres/Supabase — the schema is written to make this easy; swap `db/index.js`'s driver and adjust `lib/automation.js` if needed
-7. Real Slack posting from `daily-digest.js` (currently prints to console)
+6. Real Slack posting from `daily-digest.js` (currently prints to console)

@@ -11,6 +11,7 @@ const {
   getFulfillmentExceptions,
   getCashFlowProjection,
 } = require('../lib/automation');
+const pool = require('../db');
 
 const STALE_DAYS = 5;
 const FULFILLMENT_HOURS_THRESHOLD = 48;
@@ -24,11 +25,14 @@ function line(char = '-', len = 48) {
   return char.repeat(len);
 }
 
-function buildDigest() {
-  const reorders = getReorderSuggestions().filter((r) => r.needsReorder);
-  const followUps = getPoFollowUps(STALE_DAYS);
-  const exceptions = getFulfillmentExceptions(FULFILLMENT_HOURS_THRESHOLD);
-  const cashFlow = getCashFlowProjection(CASH_FLOW_WEEKS);
+async function buildDigest() {
+  const [reordersAll, followUps, exceptions, cashFlow] = await Promise.all([
+    getReorderSuggestions(),
+    getPoFollowUps(STALE_DAYS),
+    getFulfillmentExceptions(FULFILLMENT_HOURS_THRESHOLD),
+    getCashFlowProjection(CASH_FLOW_WEEKS),
+  ]);
+  const reorders = reordersAll.filter((r) => r.needsReorder);
 
   const out = [];
   out.push(':: Freakmount Ops — Daily Digest ::');
@@ -86,7 +90,16 @@ function buildDigest() {
 }
 
 if (require.main === module) {
-  console.log(buildDigest());
+  buildDigest()
+    .then((text) => {
+      console.log(text);
+      return pool.end();
+    })
+    .catch((err) => {
+      console.error('Digest failed:', err);
+      pool.end();
+      process.exitCode = 1;
+    });
 }
 
 module.exports = { buildDigest };

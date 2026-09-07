@@ -1,20 +1,26 @@
--- Freakmount Ops ERP — core schema
+-- Freakmount Ops ERP — core schema (Postgres).
 --
--- Written in plain, portable SQL so it can move to Postgres/Supabase later
--- with minimal changes. Notes on the SQLite -> Postgres path:
---   * `id INTEGER PRIMARY KEY` is SQLite's rowid-alias autoincrement; in
---     Postgres this becomes `id SERIAL PRIMARY KEY` (or `GENERATED ALWAYS AS
---     IDENTITY`).
---   * All dates/timestamps are stored as ISO-8601 TEXT ('YYYY-MM-DD' or
---     full timestamp) rather than SQLite-only date types, so they compare
---     lexicographically the same way in both engines and cast cleanly to
---     Postgres DATE/TIMESTAMP.
---   * Booleans are stored as INTEGER 0/1 (SQLite has no native boolean);
---     Postgres will treat these as SMALLINT or you can swap to BOOLEAN.
---   * No SQLite-only pragmas, triggers, or functions are used.
+-- This was originally written against SQLite (via better-sqlite3) and kept
+-- deliberately close to plain, portable SQL. Now that the app runs on
+-- Postgres (see db/index.js), the only thing that actually changed is
+-- `id INTEGER PRIMARY KEY` -> `id SERIAL PRIMARY KEY` so ids auto-generate
+-- the way SQLite's rowid-alias did; everything else — types, CHECK
+-- constraints, indexes — was already valid Postgres.
+--
+-- Notes:
+--   * Dates/timestamps are stored as ISO-8601 TEXT ('YYYY-MM-DD' or a full
+--     timestamp) rather than a native DATE/TIMESTAMP type. This keeps the
+--     app's date math (done in JS, see lib/automation.js) simple and
+--     engine-agnostic; casting these to real DATE columns later is a
+--     straightforward follow-up if needed.
+--   * Booleans are stored as INTEGER 0/1 rather than native BOOLEAN, again
+--     to keep the SQLite-era call sites unchanged. Fine to swap to BOOLEAN
+--     later — nothing currently depends on the 0/1 representation.
+--   * Applied via `pool.query(schemaSql)` in db/seed.js (a plain multi-statement
+--     string, not run automatically on every connection — see db/index.js).
 
 CREATE TABLE IF NOT EXISTS skus (
-  id              INTEGER PRIMARY KEY,
+  id              SERIAL PRIMARY KEY,
   sku             TEXT NOT NULL UNIQUE,
   name            TEXT NOT NULL,
   lead_time_days  INTEGER NOT NULL,
@@ -23,7 +29,7 @@ CREATE TABLE IF NOT EXISTS skus (
 );
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
-  id                  INTEGER PRIMARY KEY,
+  id                  SERIAL PRIMARY KEY,
   sku_id              INTEGER NOT NULL REFERENCES skus(id),
   factory_name        TEXT NOT NULL,
   qty                 INTEGER NOT NULL,
@@ -41,7 +47,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
 );
 
 CREATE TABLE IF NOT EXISTS production_events (
-  id          INTEGER PRIMARY KEY,
+  id          SERIAL PRIMARY KEY,
   po_id       INTEGER NOT NULL REFERENCES purchase_orders(id),
   event_type  TEXT NOT NULL,
   event_date  TEXT NOT NULL,
@@ -49,7 +55,7 @@ CREATE TABLE IF NOT EXISTS production_events (
 );
 
 CREATE TABLE IF NOT EXISTS qc_reports (
-  id               INTEGER PRIMARY KEY,
+  id               SERIAL PRIMARY KEY,
   po_id            INTEGER NOT NULL REFERENCES purchase_orders(id),
   inspection_date  TEXT NOT NULL,
   pass_fail        TEXT NOT NULL CHECK (pass_fail IN ('pass', 'fail')),
@@ -58,7 +64,7 @@ CREATE TABLE IF NOT EXISTS qc_reports (
 );
 
 CREATE TABLE IF NOT EXISTS shipments (
-  id                     INTEGER PRIMARY KEY,
+  id                     SERIAL PRIMARY KEY,
   po_id                  INTEGER NOT NULL REFERENCES purchase_orders(id),
   destination_warehouse  TEXT NOT NULL,
   carrier                TEXT,
@@ -68,7 +74,7 @@ CREATE TABLE IF NOT EXISTS shipments (
 );
 
 CREATE TABLE IF NOT EXISTS inventory_snapshots (
-  id                INTEGER PRIMARY KEY,
+  id                SERIAL PRIMARY KEY,
   sku_id            INTEGER NOT NULL REFERENCES skus(id),
   warehouse         TEXT NOT NULL,
   qty_on_hand       INTEGER NOT NULL DEFAULT 0,
@@ -77,7 +83,7 @@ CREATE TABLE IF NOT EXISTS inventory_snapshots (
 );
 
 CREATE TABLE IF NOT EXISTS sales_orders (
-  id                  INTEGER PRIMARY KEY,
+  id                  SERIAL PRIMARY KEY,
   sku_id              INTEGER NOT NULL REFERENCES skus(id),
   qty                 INTEGER NOT NULL,
   channel             TEXT NOT NULL,
@@ -88,7 +94,7 @@ CREATE TABLE IF NOT EXISTS sales_orders (
 );
 
 CREATE TABLE IF NOT EXISTS returns (
-  id                 INTEGER PRIMARY KEY,
+  id                 SERIAL PRIMARY KEY,
   order_id           INTEGER NOT NULL REFERENCES sales_orders(id),
   status             TEXT NOT NULL DEFAULT 'requested',
   label_created      INTEGER NOT NULL DEFAULT 0,
@@ -96,7 +102,7 @@ CREATE TABLE IF NOT EXISTS returns (
 );
 
 CREATE TABLE IF NOT EXISTS landed_costs (
-  id          INTEGER PRIMARY KEY,
+  id          SERIAL PRIMARY KEY,
   po_id       INTEGER NOT NULL REFERENCES purchase_orders(id),
   fob_cost    REAL NOT NULL DEFAULT 0,
   freight     REAL NOT NULL DEFAULT 0,

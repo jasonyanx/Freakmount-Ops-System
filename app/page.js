@@ -6,7 +6,7 @@ import {
 } from '../lib/automation';
 
 // Server-rendered on every request — this is a live ops dashboard, not a
-// static page, and better-sqlite3 needs the Node runtime (not edge).
+// static page. Node runtime (not edge) since `pg` needs real TCP sockets.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -18,12 +18,14 @@ function money(n) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-export default function DashboardPage() {
-  const reorders = getReorderSuggestions();
+export default async function DashboardPage() {
+  const [reorders, followUps, exceptions, cashFlow] = await Promise.all([
+    getReorderSuggestions(),
+    getPoFollowUps(STALE_DAYS),
+    getFulfillmentExceptions(FULFILLMENT_HOURS_THRESHOLD),
+    getCashFlowProjection(CASH_FLOW_WEEKS),
+  ]);
   const reorderNeeded = reorders.filter((r) => r.needsReorder);
-  const followUps = getPoFollowUps(STALE_DAYS);
-  const exceptions = getFulfillmentExceptions(FULFILLMENT_HOURS_THRESHOLD);
-  const cashFlow = getCashFlowProjection(CASH_FLOW_WEEKS);
 
   return (
     <div className="page">
