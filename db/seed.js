@@ -14,7 +14,10 @@ const fs = require('fs');
 const path = require('path');
 const pool = require('./index');
 
-const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
+// Resolved from process.cwd() rather than __dirname: Next.js bundles this
+// module into its server build (a different directory tree at build time)
+// when app/api/seed/route.js imports it — see db/index.js's identical note.
+const SCHEMA_PATH = path.join(process.cwd(), 'db', 'schema.sql');
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function daysAgoISO(n) {
@@ -25,7 +28,7 @@ function daysFromNowISO(n) {
   return new Date(Date.now() + n * DAY_MS).toISOString().slice(0, 10);
 }
 
-async function seed() {
+async function seedDatabase() {
   const schemaSql = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await pool.query(schemaSql);
 
@@ -305,14 +308,23 @@ async function seed() {
   } finally {
     client.release();
   }
-
-  console.log('Seed complete: 3 SKUs, 7 POs, 30 days of sales history, inventory across US/CA/CN.');
 }
 
-seed()
-  .then(() => pool.end())
-  .catch((err) => {
-    console.error('Seed failed:', err);
-    pool.end();
-    process.exitCode = 1;
-  });
+module.exports = { seedDatabase };
+
+// CLI usage: `npm run seed` / `node db/seed.js`. When imported instead (see
+// app/api/seed/route.js, which reuses the shared pool across requests), the
+// caller owns the pool's lifecycle — importing this file must not print to
+// stdout or close the pool out from under it.
+if (require.main === module) {
+  seedDatabase()
+    .then(() => {
+      console.log('Seed complete: 3 SKUs, 7 POs, 30 days of sales history, inventory across US/CA/CN.');
+      return pool.end();
+    })
+    .catch((err) => {
+      console.error('Seed failed:', err);
+      pool.end();
+      process.exitCode = 1;
+    });
+}

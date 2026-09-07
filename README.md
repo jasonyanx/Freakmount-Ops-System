@@ -38,17 +38,30 @@ npm run dev    # http://localhost:3000
    Postgres add-on names its variable `POSTGRES_URL`; if you use that,
    also add a `DATABASE_URL` env var with the same value, since that's
    the name this app reads.)
-3. Deploy.
-4. Once deployed, initialize the schema and seed data by running
-   `DATABASE_URL=<that connection string> npm run seed` from your machine
-   (pointed at the same database) — the app itself never writes data in
-   this phase, so nothing seeds it automatically.
+3. Also add a `SEED_SECRET` env var — any random string (e.g. from
+   `openssl rand -hex 16`).
+4. Deploy.
+5. Once deployed, initialize the schema and load seed data by visiting,
+   in your browser:
+
+   ```
+   https://<your-deployment>.vercel.app/api/seed?secret=<the SEED_SECRET you set>
+   ```
+
+   You should see `{"ok":true,...}`. This applies `db/schema.sql` and
+   loads the sample data — the app itself never writes data in this
+   phase, so nothing seeds it automatically. Safe to revisit any time you
+   want to reset back to the sample dataset (it wipes and reloads).
+
+   Prefer a terminal? `DATABASE_URL=<connection string> npm run seed`
+   from your own machine does the same thing.
 
 ## Scripts
 
 | Script | Does |
 |---|---|
 | `npm run seed` | Applies `db/schema.sql` and (re)loads seed data (`db/seed.js`) — safe to re-run, wipes and reloads |
+| `GET /api/seed?secret=...` | Same thing, triggerable from a browser against a deployed instance — see "Deploying to Vercel" |
 | `npm run dev` | Next.js dev server |
 | `npm run build` | Production build |
 | `npm run digest` | Prints the daily ops digest to the console (`scripts/daily-digest.js`) — stands in for a scheduled job that would post the same digest to Slack |
