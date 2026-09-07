@@ -1,0 +1,8 @@
+node_modules/
+.next/
+db/*.db
+db/*.db-journal
+db/*.db-wal
+db/*.db-shm
+.env*.local
+npm-debug.log*
